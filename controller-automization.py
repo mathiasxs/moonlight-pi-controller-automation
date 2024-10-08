@@ -8,10 +8,12 @@ import subprocess
 import time
 
 # config
-gaming_pc_ip = "192.168.178.47"
+gaming_pc_ip = "192.168.178.64"
 gaming_pc_mac = "D8-43-AE-54-66-8F" # LAN-Adapter MAC
 moonlight_parameters = ['-4k', '-fps 60', '-bitrate 40', '-quitappafter'] # https://github.com/moonlight-stream/moonlight-embedded/wiki/Usage
+
 wake_up_pc_tries = 3
+wake_up_pc_timeout_seconds = 3
 
 # init
 cec.init()
@@ -51,12 +53,15 @@ async def wake_up_pc(tries):
     is_alive = subprocess.call(['ping', '-c', '1', gaming_pc_ip], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT) == 0
     if not is_alive:
         print(f"Sending wake command to gaming pc. Tries left: {tries-1}")
-        subprocess.Popen('/usr/sbin/etherwake -b ' + gaming_pc_mac, shell=True, stdout=subprocess.PIPE)
-        await asyncio.sleep(10)
-        return await wake_up_pc(--tries)
+        subprocess.Popen('sudo /usr/sbin/etherwake -b ' + gaming_pc_mac.replace("-", ":"), shell=True, stdout=subprocess.PIPE)
+
+        print(f"wait {wake_up_pc_timeout_seconds} sec")
+        await asyncio.sleep(wake_up_pc_timeout_seconds)
+
+        return await wake_up_pc(tries-1)
     else:
         return True
-    
+
 # start moonlight
 def start_moonlight():
     subprocess.Popen(['moonlight-qt', 'stream'] + moonlight_parameters + [gaming_pc_ip])
