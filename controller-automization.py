@@ -13,7 +13,10 @@ gaming_pc_mac = "D8-43-AE-54-66-8F" # LAN-Adapter MAC
 moonlight_parameters = ['-4k', '-fps 60', '-bitrate 40', '-quitappafter'] # https://github.com/moonlight-stream/moonlight-embedded/wiki/Usage
 
 wake_up_pc_tries = 3
-wake_up_pc_wait_seconds = 3
+wake_up_pc_wait_seconds = 10
+
+# TODO
+# HttpServer bauen der auf Gaming PC Linux im lokalen Netzwerk läuft und "shutdown" POST entgegen nimmt und damit den PC herunterfährt
 
 # init
 cec.init()
@@ -40,6 +43,10 @@ async def receive_connected_event():
 
                 start_tv()
                 start_moonlight()
+            # else:
+                # close moonlight-qt
+                # power off TV
+                # shutdown pc
 
     properties.on_properties_changed(device_property_changed_cb)
 
@@ -65,11 +72,9 @@ async def wake_up_pc(tries):
 # start tv and connect
 def start_tv():
     devices = cec.list_devices()
-    if not devices[0].is_on():
-        devices[0].power_on()
-        print("TV started")
-    else:
-        print("TV is already on")
+    devices[0].power_on()
+    cec.set_active_source(devices[0].address)
+    print("TV should be started")
 
 # start moonlight
 def start_moonlight():
