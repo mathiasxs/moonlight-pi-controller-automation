@@ -1,0 +1,11 @@
+[Unit]
+Description=Start pc, tv and moonlight-qt by connecting a controller by bluetooth
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/python3 /home/moonshine/controller-automation.py
+Restart=on-failure
+User=moonshine
+
+[Install]
+WantedBy=multi-user.target
