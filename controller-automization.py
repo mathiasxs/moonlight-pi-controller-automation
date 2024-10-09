@@ -15,9 +15,6 @@ moonlight_parameters = ['-4k', '-fps 60', '-bitrate 40', '-quitappafter'] # http
 wake_up_pc_tries = 3
 wake_up_pc_wait_seconds = 10
 
-# TODO
-# HttpServer bauen der auf Gaming PC Linux im lokalen Netzwerk läuft und "shutdown" POST entgegen nimmt und damit den PC herunterfährt
-
 # init
 cec.init()
 devices = cec.list_devices()
