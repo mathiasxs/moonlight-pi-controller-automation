@@ -8,19 +8,18 @@ import dbus.service
 import dbus.mainloop.glib
 from gi.repository import GObject, GLib
 
-import asyncio
 import cec
 import subprocess
 import time
 
 # config
-gaming_pc_ip = "192.168.178.64"
-gaming_pc_mac = "D8-43-AE-54-66-8F" # LAN-Adapter MAC
-moonlight_parameters = [] # https://github.com/moonlight-stream/moonlight-embedded/wiki/Usage
-controller_mac = "28:C1:3C:5B:22:E0"
-
-wake_up_pc_tries = 5
-wake_up_pc_wait_seconds = 10
+GAMING_PC_IP = ""
+GAMING_PC_MAC = "" # LAN-Adapter MAC
+CONTROLLER_MAC = ""
+MOONLIGHT_PARAMETERS = [] # https://github.com/moonlight-stream/moonlight-embedded/wiki/Usage
+WAKE_UP_PC_TRIES = 10
+WAKE_UP_PC_WAIT_SECONDS = 6
+WAKE_UP_TV_WAIT_SECONDS = 3
 
 # init
 cec.init()
@@ -32,7 +31,7 @@ DBUS_OM_IFACE =      "org.freedesktop.DBus.ObjectManager"
 DBUS_PROP_IFACE =    "org.freedesktop.DBus.Properties"
 
 LOG_FILE = "log_btminder.txt"
-LOG_LEVEL = logging.INFO
+LOG_LEVEL = logging.ERROR
 LOG_FORMAT = "%(asctime)s %(levelname)s %(message)s"
 
 logging.basicConfig(filename=LOG_FILE, format=LOG_FORMAT, level=LOG_LEVEL)
@@ -55,14 +54,17 @@ def device_property_changed_cb(iface, changed_props, invalidated_props, path=Non
         action = "connected" if properties["Connected"] else "disconnected"
         logger.info("The device {} [{}] is {}".format(properties["Alias"], properties["Address"], action))
 
-        is_alive = wake_up_pc(wake_up_pc_tries)
-        if not is_alive:
-            # failed to wake up pc
-            print("Error: PC couldn't be woken up")
-            return
+        if properties["Connected"] == True:
+            # connected
 
-        start_tv()
-        start_moonlight()
+            if properties["Address"] == CONTROLLER_MAC:
+                start_streaming()
+
+        if properties["Connected"] == False:
+            # disconnected
+
+            if properties["Address"] == CONTROLLER_MAC:
+                stop_streaming()
 
     if "RSSI" in changed_props:
         dBs = properties["RSSI"]
@@ -71,20 +73,39 @@ def device_property_changed_cb(iface, changed_props, invalidated_props, path=Non
 def shutdown(signum, frame):
     mainloop.quit()
 
+def start_streaming():
+    is_alive = wake_up_pc(WAKE_UP_PC_TRIES)
+    if not is_alive:
+        # failed to wake up pc
+        logger.error("Error: PC couldn't be woken up")
+        return
+    
+    try: 
+        start_tv() 
+    except: 
+        logger.error("Unable to start TV")
+
+    start_moonlight()
+
+def stop_streaming():
+    standby_tv()
+    subprocess.Popen(['pkill', 'moonlight'])
+    # TODO: send standby command to pc
+
 # wake up pc
 def wake_up_pc(tries):
     if (tries == 0):
         return False
 
-    is_alive = subprocess.call(['ping', '-c', '1', gaming_pc_ip], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT) == 0
+    is_alive = subprocess.call(['ping', '-c', '1', GAMING_PC_IP], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT) == 0
     if is_alive:
         return True
 
-    print(f"Sending wake command to gaming pc. Tries left: {tries-1}")
-    subprocess.Popen('sudo /usr/sbin/etherwake -b ' + gaming_pc_mac.replace("-", ":"), shell=True, stdout=subprocess.PIPE)
+    logger.info(f"Sending wake command to gaming pc. Tries left: {tries-1}")
+    subprocess.Popen('sudo /usr/sbin/etherwake -b ' + GAMING_PC_MAC.replace("-", ":"), shell=True, stdout=subprocess.PIPE)
 
-    print(f"Wait {wake_up_pc_wait_seconds} sec")
-    time.sleep(wake_up_pc_wait_seconds)
+    logger.info(f"Wait {WAKE_UP_PC_WAIT_SECONDS} sec")
+    time.sleep(WAKE_UP_PC_WAIT_SECONDS)
 
     return wake_up_pc(tries-1)
 
@@ -93,13 +114,23 @@ def start_tv():
     devices = cec.list_devices()
     devices[0].power_on()
     cec.set_active_source(devices[0].address)
-    time.sleep(3)
+
+    time.sleep(WAKE_UP_TV_WAIT_SECONDS) # wait until TV is launched
+
     logger.info("TV should be started")
+
+# stop tv
+def standby_tv():
+    devices = cec.list_devices()
+    devices[0].standby()
+
+    logger.info("TV is in standby")
 
 # start moonlight
 def start_moonlight():
-    subprocess.Popen(['moonlight-qt'] + moonlight_parameters + ['stream', gaming_pc_ip, 'Steam'])
-    print("Moonlight started")
+    # subprocess.Popen(['moonlight-qt'] + MOONLIGHT_PARAMETERS + ['stream', GAMING_PC_IP, 'Desktop']) # start direct streaming (paired host required)
+    subprocess.Popen(['moonlight-qt'] + MOONLIGHT_PARAMETERS) # start only moonlight
+    logger.info("Moonlight started")
     # pkill moonlight if there are problems
 
 if __name__ == "__main__":
