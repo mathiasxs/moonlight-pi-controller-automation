@@ -54,15 +54,13 @@ def device_property_changed_cb(iface, changed_props, invalidated_props, path=Non
         action = "connected" if properties["Connected"] else "disconnected"
         logger.info("The device {} [{}] is {}".format(properties["Alias"], properties["Address"], action))
 
+        # connected
         if properties["Connected"] == True:
-            # connected
-
             if properties["Address"] == CONTROLLER_MAC:
                 start_streaming()
 
+        # disconnected
         if properties["Connected"] == False:
-            # disconnected
-
             if properties["Address"] == CONTROLLER_MAC:
                 stop_streaming()
 
@@ -74,18 +72,14 @@ def shutdown(signum, frame):
     mainloop.quit()
 
 def start_streaming():
+    start_tv() 
+    start_moonlight()
+
     is_alive = wake_up_pc(WAKE_UP_PC_TRIES)
     if not is_alive:
         # failed to wake up pc
         logger.error("Error: PC couldn't be woken up")
         return
-    
-    try: 
-        start_tv() 
-    except: 
-        logger.error("Unable to start TV")
-
-    start_moonlight()
 
 def stop_streaming():
     standby_tv()
@@ -104,32 +98,40 @@ def wake_up_pc(tries):
     logger.info(f"Sending wake command to gaming pc. Tries left: {tries-1}")
     subprocess.Popen('sudo /usr/sbin/etherwake -b ' + GAMING_PC_MAC.replace("-", ":"), shell=True, stdout=subprocess.PIPE)
 
-    logger.info(f"Wait {WAKE_UP_PC_WAIT_SECONDS} sec")
+    logger.info(f"Wait gaming pc {GAMING_PC_IP} {WAKE_UP_PC_WAIT_SECONDS} sec to wake up")
     time.sleep(WAKE_UP_PC_WAIT_SECONDS)
 
     return wake_up_pc(tries-1)
 
 # start tv and connect
 def start_tv():
-    devices = cec.list_devices()
-    devices[0].power_on()
-    cec.set_active_source(devices[0].address)
+    try: 
+        devices = cec.list_devices()
+        devices[0].power_on()
+        cec.set_active_source(devices[0].address)
 
-    time.sleep(WAKE_UP_TV_WAIT_SECONDS) # wait until TV is launched
+        logger.info(f"Wait TV {WAKE_UP_TV_WAIT_SECONDS} sec to wake up")
+        time.sleep(WAKE_UP_TV_WAIT_SECONDS) # wait until TV is launched
+    except: 
+        logger.error("Unable to start TV")
+        return
 
     logger.info("TV should be started")
 
 # stop tv
 def standby_tv():
-    devices = cec.list_devices()
-    devices[0].standby()
+    try: 
+        devices = cec.list_devices()
+        devices[0].standby()
 
-    logger.info("TV is in standby")
+        logger.info("TV is in standby")
+    except: 
+        logger.error("Unable to standby TV")
 
 # start moonlight
 def start_moonlight():
-    # subprocess.Popen(['moonlight-qt'] + MOONLIGHT_PARAMETERS + ['stream', GAMING_PC_IP, 'Desktop']) # start direct streaming (paired host required)
-    subprocess.Popen(['moonlight-qt'] + MOONLIGHT_PARAMETERS) # start only moonlight
+    subprocess.Popen(['moonlight-qt'] + MOONLIGHT_PARAMETERS + ['stream', GAMING_PC_IP, 'Desktop']) # start direct streaming (paired host required)
+    # subprocess.Popen(['moonlight-qt'] + MOONLIGHT_PARAMETERS) # start only moonlight
     logger.info("Moonlight started")
     # pkill moonlight if there are problems
 
