@@ -1,4 +1,3 @@
-```markdown
 # Controller-Triggered Game Streaming
 
 Turn on the controller. The TV wakes up, the gaming PC wakes up, and the stream starts.
